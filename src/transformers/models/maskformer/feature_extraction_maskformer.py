@@ -14,7 +14,7 @@
 # limitations under the License.
 """Feature extractor class for MaskFormer."""
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from PIL import Image
@@ -30,7 +30,8 @@ if is_torch_available():
     from torch import Tensor, nn
     from torch.nn.functional import interpolate
 
-    from transformers.models.maskformer.modeling_maskformer import MaskFormerForInstanceSegmentationOutput
+    if TYPE_CHECKING:
+        from transformers.models.maskformer.modeling_maskformer import MaskFormerForInstanceSegmentationOutput
 
 logger = logging.get_logger(__name__)
 
@@ -248,11 +249,9 @@ class MaskFormerFeatureExtractor(FeatureExtractionMixin, ImageFeatureExtractionM
             valid_annotations = type(annotations) is list and "masks" in annotations[0] and "labels" in annotations[0]
             if not valid_annotations:
                 raise ValueError(
-                    """
-                    Annotations must of type `Dict` (single image) or `List[Dict]` (batch of images). The annotations
-                    must be numpy arrays in the following format: { "masks" : the target mask, with shape [C,H,W],
-                    "labels" : the target labels, with shape [C]}
-                    """
+                    "Annotations must of type `Dict` (single image) or `List[Dict]` (batch of images)."
+                    "The annotations must be numpy arrays in the following format:"
+                    "{ 'masks' : the target mask, with shape [C,H,W], 'labels' : the target labels, with shape [C]}"
                 )
 
         # transformations (resizing + normalization)
@@ -329,9 +328,9 @@ class MaskFormerFeatureExtractor(FeatureExtractionMixin, ImageFeatureExtractionM
             - **pixel_mask** -- Pixel mask to be fed to a model (when `pad_and_return_pixel_mask=True` or if
               *"pixel_mask"* is in `self.model_input_names`).
             - **mask_labels** -- Optional mask labels of shape `(batch_size, num_classes, height, width) to be fed to a
-              model (when `annotations` are provided)
+              model (when `annotations` are provided).
             - **class_labels** -- Optional class labels of shape `(batch_size, num_classes) to be fed to a model (when
-              `annotations` are provided)
+              `annotations` are provided).
         """
 
         max_size = self._max_by_axis([list(image.shape) for image in pixel_values_list])
@@ -384,11 +383,11 @@ class MaskFormerFeatureExtractor(FeatureExtractionMixin, ImageFeatureExtractionM
 
         Args:
             outputs ([`MaskFormerForInstanceSegmentationOutput`]):
-                The outputs from [`MaskFormerForInstanceSegmentation`]
+                The outputs from [`MaskFormerForInstanceSegmentation`].
 
         Returns:
             `torch.Tensor`:
-                A tensor of shape (`batch_size, num_labels, height, width`)
+                A tensor of shape (`batch_size, num_labels, height, width`).
         """
         # class_queries_logitss has shape [BATCH, QUERIES, CLASSES + 1]
         class_queries_logits = outputs.class_queries_logits
@@ -474,7 +473,7 @@ class MaskFormerFeatureExtractor(FeatureExtractionMixin, ImageFeatureExtractionM
 
         Args:
             outputs ([`MaskFormerForInstanceSegmentationOutput`]):
-                The outputs from [`MaskFormerForInstanceSegmentation`]
+                The outputs from [`MaskFormerForInstanceSegmentation`].
             object_mask_threshold (`float`, *optional*, defaults to 0.8):
                 The object mask threshold.
             overlap_mask_area_threshold (`float`, *optional*, defaults to 0.8):

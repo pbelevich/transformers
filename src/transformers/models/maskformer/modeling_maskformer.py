@@ -227,7 +227,7 @@ class MaskFormerPixelDecoderOutput(ModelOutput):
 
 
 @dataclass
-class MaskFormerOutput(ModelOutput):
+class MaskFormerModelOutput(ModelOutput):
     """
     Class for outputs of [`MaskFormerModel`]. This class returns all the needed hidden states to compute the logits.
 
@@ -456,6 +456,11 @@ def pair_wise_sigmoid_focal_loss(inputs: Tensor, labels: Tensor, alpha: float = 
         labels (`torch.Tensor`):
             A tensor with the same shape as inputs. Stores the binary classification labels for each element in inputs
             (0 for the negative class and 1 for the positive class).
+        alpha (float, *optional*, defaults to 0.25):
+            Weighting factor in range (0,1) to balance positive vs negative examples.
+        gamma (float, *optional*, defaults to 2.0):
+            Exponent of the modulating factor (1 - p_t) to balance easy vs hard examples.
+
 
     Returns:
         `torch.Tensor`: The computed loss between each pairs.
@@ -1414,6 +1419,7 @@ def _expand_mask(mask: torch.Tensor, dtype: torch.dtype, tgt_len: Optional[int] 
     return inverted_mask.masked_fill(inverted_mask.bool(), torch.finfo(dtype).min)
 
 
+# Copied from transformers.models.detr.modeling_detr.DetrDecoder with DetrPreTrainedModel->nn.Module
 class DetrDecoder(nn.Module):
     """
     Transformer decoder consisting of *config.decoder_layers* layers. Each layer is a [`DetrDecoderLayer`].
@@ -2286,7 +2292,7 @@ class MaskFormerModel(MaskFormerPreTrainedModel):
     @add_code_sample_docstrings(
         processor_class=_FEAT_EXTRACTOR_FOR_DOC,
         checkpoint=_CHECKPOINT_FOR_DOC,
-        output_type=MaskFormerOutput,
+        output_type=MaskFormerModelOutput,
         config_class=_CONFIG_FOR_DOC,
         modality="vision",
     )
@@ -2297,7 +2303,7 @@ class MaskFormerModel(MaskFormerPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> MaskFormerOutput:
+    ) -> MaskFormerModelOutput:
 
         if pixel_values is None:
             raise ValueError("You have to specify pixel_values")
@@ -2327,7 +2333,7 @@ class MaskFormerModel(MaskFormerPreTrainedModel):
         pixel_decoder_hidden_states = pixel_level_module_output.decoder_hidden_states if output_hidden_states else ()
         transformer_decoder_hidden_states = transformer_module_output.hidden_states if output_hidden_states else ()
 
-        output = MaskFormerOutput(
+        output = MaskFormerModelOutput(
             encoder_last_hidden_state=image_features,
             pixel_decoder_last_hidden_state=pixel_embeddings,
             transformer_decoder_last_hidden_state=queries,
@@ -2392,7 +2398,7 @@ class MaskFormerForInstanceSegmentation(MaskFormerPreTrainedModel):
     def get_loss(self, loss_dict: Dict[str, Tensor]) -> Tensor:
         return sum(loss_dict.values())
 
-    def get_logits(self, outputs: MaskFormerOutput) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
+    def get_logits(self, outputs: MaskFormerModelOutput) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
         pixel_embeddings = outputs.pixel_decoder_last_hidden_state
         # get the auxilary predictions (one for each decoder's layer)
         auxilary_logits: List[str, Tensor] = []
@@ -2471,7 +2477,7 @@ class MaskFormerForInstanceSegmentation(MaskFormerPreTrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs: MaskFormerOutput = self.model(
+        outputs: MaskFormerModelOutput = self.model(
             pixel_values,
             pixel_mask,
             output_hidden_states=output_hidden_states,
