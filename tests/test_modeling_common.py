@@ -737,6 +737,24 @@ class ModelTesterMixin:
             except RuntimeError:
                 self.fail("Couldn't trace module.")
 
+            # Test serialization
+            import pickle
+
+            with tempfile.TemporaryDirectory() as tmp_dir_name:
+                pickle_file_name = os.path.join(tmp_dir_name, "traced_model.pkl")
+
+                try:
+                    with open(pickle_file_name, 'wb') as f:
+                        pickle.dump(traced_model, f)
+                except Exception:
+                    self.fail("Couldn't save module.")
+
+                try:
+                    with open(pickle_file_name, 'rb') as f:
+                        loaded = pickle.load(f)
+                except Exception:
+                    self.fail("Couldn't load module.")
+
             def flatten_output(output):
                 flatten = []
                 for x in output:
