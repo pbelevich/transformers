@@ -261,7 +261,8 @@ class HFTracer(Tracer):
         # )
 
         super().__init__(
-            autowrap_modules=autowrap_modules, autowrap_functions=autowrap_functions, enable_cpatching=enable_cpatching
+            autowrap_modules=autowrap_modules, autowrap_functions=autowrap_functions
+            # , enable_cpatching=enable_cpatching
         )
 
         if not is_torch_fx_available():
