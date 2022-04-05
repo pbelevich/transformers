@@ -2103,8 +2103,8 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
 
         return retrieved_modules
 
-    @classmethod
-    def _load_pretrained_model_low_mem(cls, model, loaded_state_dict_keys, resolved_archive_file):
+    @staticmethod
+    def _load_pretrained_model_low_mem(model, loaded_state_dict_keys, resolved_archive_file):
         """
         This is an experimental function that loads the model using ~1.x model size CPU memory
 
@@ -2159,13 +2159,14 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
             resolved_archive_file = [resolved_archive_file]
 
         for archive_file in resolved_archive_file:
-            state_dict = torch.load(resolved_archive_file, map_location="cpu")
+            state_dict = torch.load(archive_file, map_location="cpu")
 
             # materialize state_dict entries one by one on CPU
             for k in loaded_state_dict_keys:
                 submodule, param_name = find_submodule_and_param_name(model, k)
                 if submodule is not None:
-                    new_val = state_dict[k]
+                    param_dtype = getattr(submodule, param_name).dtype
+                    new_val = state_dict[k].to(param_dtype)
                     if isinstance(getattr(submodule, param_name), torch.nn.Parameter):
                         new_val = torch.nn.Parameter(new_val)
                     setattr(submodule, param_name, new_val)
