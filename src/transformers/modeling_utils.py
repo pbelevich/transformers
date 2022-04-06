@@ -1487,7 +1487,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 Please refer to the mirror site for more information.
             _fast_init(`bool`, *optional*, defaults to `True`):
                 Whether or not to disable fast initialization.
-            low_cpu_mem_usage(`bool``, *optional*, defaults to `False`):
+            low_cpu_mem_usage(`bool`, *optional*, defaults to `False`):
                 Tries to not use more than 1x model size in CPU memory (including peak memory) while loading the model.
                 This is an experimental feature and a subject to change at any moment.
             torch_dtype (`str` or `torch.dtype`, *optional*):
@@ -1823,7 +1823,6 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 if is_sharded:
                     loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
                 else:
-                    state_dict = load_state_dict(resolved_archive_file)
                     loaded_state_dict_keys = [k for k in state_dict.keys()]
                     del state_dict  # free CPU memory - will reload again later
 
