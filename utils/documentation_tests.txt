@@ -1,6 +1,9 @@
 docs/source/en/quicktour.mdx
 docs/source/en/task_summary.mdx
 docs/source/en/model_doc/speech_to_text.mdx
+docs/source/en/model_doc/t5.mdx
+docs/source/en/model_doc/t5v1_1.mdx
+docs/source/en/model_doc/byt5.mdx
 docs/source/en/model_doc/tapex.mdx
 src/transformers/generation_utils.py
 src/transformers/models/bart/modeling_bart.py
@@ -16,6 +19,7 @@ src/transformers/models/deit/modeling_deit.py
 src/transformers/models/dpt/modeling_dpt.py
 src/transformers/models/glpn/modeling_glpn.py
 src/transformers/models/gpt2/modeling_gpt2.py
+src/transformers/models/gptj/modeling_gptj.py
 src/transformers/models/hubert/modeling_hubert.py
 src/transformers/models/marian/modeling_marian.py
 src/transformers/models/mbart/modeling_mbart.py
@@ -48,3 +52,4 @@ src/transformers/models/wav2vec2/modeling_wav2vec2.py
 src/transformers/models/wav2vec2/tokenization_wav2vec2.py
 src/transformers/models/wav2vec2_with_lm/processing_wav2vec2_with_lm.py
 src/transformers/models/wavlm/modeling_wavlm.py
+src/transformers/models/ctrl/modeling_ctrl.py
