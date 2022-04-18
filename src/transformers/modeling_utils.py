@@ -589,7 +589,8 @@ class ModuleUtilsMixin:
         return encoder_extended_attention_mask
 
     @staticmethod
-    def create_extended_attention_mask_for_decoder(input_shape, attention_mask, device):
+    def create_extended_attention_mask_for_decoder(input_shape, attention_mask):
+        device = attention_mask.device  # it's safer to do it here because device must be the same for attention_mask and causal_mask!
         batch_size, seq_length = input_shape
         seq_ids = torch.arange(seq_length, device=device)
         causal_mask = seq_ids[None, None, :].repeat(batch_size, seq_length, 1) <= seq_ids[None, :, None]
@@ -610,7 +611,7 @@ class ModuleUtilsMixin:
         extended_attention_mask = causal_mask[:, None, :, :] * attention_mask[:, None, None, :]
         return extended_attention_mask
 
-    def get_extended_attention_mask(self, attention_mask: Tensor, input_shape: Tuple[int], device: device) -> Tensor:
+    def get_extended_attention_mask(self, attention_mask: Tensor, input_shape: Tuple[int]) -> Tensor:
         """
         Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
 
@@ -619,8 +620,6 @@ class ModuleUtilsMixin:
                 Mask with ones indicating tokens to attend to, zeros for tokens to ignore.
             input_shape (`Tuple[int]`):
                 The shape of the input to the model.
-            device: (`torch.device`):
-                The device of the input to the model.
 
         Returns:
             `torch.Tensor` The extended attention mask, with a the same dtype as `attention_mask.dtype`.
@@ -635,7 +634,7 @@ class ModuleUtilsMixin:
             # - if the model is an encoder, make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
             if self.config.is_decoder:
                 extended_attention_mask = ModuleUtilsMixin.create_extended_attention_mask_for_decoder(
-                    input_shape, attention_mask, device
+                    input_shape, attention_mask
                 )
             else:
                 extended_attention_mask = attention_mask[:, None, None, :]
