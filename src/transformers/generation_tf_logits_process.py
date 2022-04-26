@@ -19,6 +19,7 @@ from typing import List
 import numpy as np
 import tensorflow as tf
 
+from .tf_utils import stable_softmax
 from .utils import add_start_docstrings
 from .utils.logging import get_logger
 
@@ -166,7 +167,7 @@ class TFTopPLogitsWarper(TFLogitsWarper):
         topk_scores, topk_indices = tf.math.top_k(scores, scores.shape[-1])
 
         mask_scores = tf.fill(scores.shape, self.filter_value)
-        cumulative_probs = tf.math.cumsum(tf.nn.softmax(topk_scores, axis=-1), axis=-1)
+        cumulative_probs = tf.math.cumsum(stable_softmax(topk_scores, axis=-1), axis=-1)
         score_mask = cumulative_probs < self.top_p
 
         # Also include the token that is higher than top_p (the first false = shift and insert a True on the left)
@@ -215,13 +216,18 @@ class TFMinLengthLogitsProcessor(TFLogitsProcessor):
         self.min_length = min_length
         self.eos_token_id = eos_token_id
 
-    def __call__(self, input_ids: tf.Tensor, scores: tf.Tensor, cur_len: int) -> tf.Tensor:
-        # TODO(Matt) - this if statement has to be rewritten for XLA. Leaving it now though since
-        # generate is not XLA - compileable anyways
-        if cur_len < self.min_length:
-            eos_token_id_mask = tf.broadcast_to(tf.range(scores.shape[-1]) == self.eos_token_id, scores.shape)
-            scores = tf.where(eos_token_id_mask, float("-inf"), scores)
+    def _apply_eos_token_mask(self, scores: tf.Tensor) -> tf.Tensor:
+        eos_token_id_mask = tf.range(scores.shape[-1]) == self.eos_token_id
+        scores = tf.where(eos_token_id_mask, float("-inf"), scores)
+        return scores
 
+    def __call__(self, input_ids: tf.Tensor, scores: tf.Tensor, cur_len: int) -> tf.Tensor:
+        # applies eos token masking if the first argument is true
+        scores = tf.cond(
+            tf.less(cur_len, self.min_length),
+            lambda: self._apply_eos_token_mask(scores),
+            lambda: tf.identity(scores),
+        )
         return scores
 
 
