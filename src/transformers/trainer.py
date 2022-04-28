@@ -29,6 +29,7 @@ import warnings
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from pippy.PipelineDriver import PipelineDriverBase
 
 from tqdm.auto import tqdm
 
@@ -289,6 +290,7 @@ class Trainer:
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = None,
+        pippy_driver : Optional[PipelineDriverBase] = None,
     ):
         if args is None:
             output_dir = "tmp_trainer"
@@ -510,6 +512,11 @@ class Trainer:
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
+        if self.args.pippy:
+            assert pippy_driver is not None
+
+        self.pippy_driver = pippy_driver
+
         # very last
         self._memory_tracker.stop_and_update_metrics()
 
@@ -552,7 +559,7 @@ class Trainer:
         self.callback_handler.remove_callback(callback)
 
     def _move_model_to_device(self, model, device):
-        model = model.to(device)
+        # model = model.to(device)
         # Moving a model to an XLA device disconnects the tied weights, so we have to retie them.
         if self.args.parallel_mode == ParallelMode.TPU and hasattr(model, "tie_weights"):
             model.tie_weights()
@@ -867,6 +874,9 @@ class Trainer:
                     optim=optimizer_cls,
                     **optimizer_kwargs,
                 )
+            elif self.args.pippy:
+                assert self.pippy_driver
+                self.optimizer = self.pippy_driver.instantiate_optimizer(optimizer_cls, **optimizer_kwargs)
             else:
                 self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
                 if optimizer_cls.__name__ == "Adam8bit":
@@ -1105,6 +1115,8 @@ class Trainer:
             model = nn.parallel.DistributedDataParallel(
                 model, device_ids=[int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))]
             )
+        elif self.args.pippy:
+            return model
         elif self.args.local_rank != -1:
             kwargs = {}
             if self.args.ddp_find_unused_parameters is not None:
@@ -1527,6 +1539,7 @@ class Trainer:
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
+            
             if step < 0:
                 logger.warning(
                     f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
@@ -2052,6 +2065,9 @@ class Trainer:
         elif self.deepspeed:
             # loss gets scaled under gradient_accumulation_steps in deepspeed
             loss = self.deepspeed.backward(loss)
+        elif self.pippy_driver is not None:
+            # PiPPy internally computes loss and backwards
+            pass
         else:
             loss.backward()
 
@@ -2067,7 +2083,11 @@ class Trainer:
             labels = inputs.pop("labels")
         else:
             labels = None
-        outputs = model(**inputs)
+        if self.args.pippy:
+            assert self.pippy_driver is not None
+            outputs = self.pippy_driver.run(self.args.pipeline_chunks, **inputs)
+        else:
+            outputs = model(**inputs)
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
@@ -2213,7 +2233,7 @@ class Trainer:
 
     def store_flos(self):
         # Storing the number of floating-point operations that went into the model
-        if self.args.local_rank != -1:
+        if self.args.local_rank != -1 and not self.args.pippy:
             self.state.total_flos += (
                 distributed_broadcast_scalars([self.current_flos], device=self.args.device).sum().item()
             )
@@ -2620,6 +2640,8 @@ class Trainer:
             tensors = nested_xla_mesh_reduce(tensors, name)
         elif is_sagemaker_mp_enabled():
             tensors = smp_gather(tensors)
+        elif self.args.pippy:
+            return tensors
         elif self.args.local_rank != -1:
             tensors = distributed_concat(tensors)
         return tensors

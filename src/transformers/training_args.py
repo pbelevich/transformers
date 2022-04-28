@@ -684,6 +684,12 @@ class TrainingArguments:
             "help": "Enable deepspeed and pass the path to deepspeed json config file (e.g. ds_config.json) or an already loaded json file as a dict"
         },
     )
+    pippy : bool = field(
+        default = False,
+        metadata = {
+            "help": "Use PiPPy for parallelism",
+        }
+    )
     label_smoothing_factor: float = field(
         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
     )
@@ -767,6 +773,10 @@ class TrainingArguments:
     mp_parameters: str = field(
         default="",
         metadata={"help": "Used by the SageMaker launcher to send mp-specific args. Ignored in Trainer"},
+    )
+    pipeline_chunks : int = field(
+        default=1,
+        metadata={"help": "Number of chunks to split batches into when pipelining"}
     )
 
     def __post_init__(self):
@@ -1089,6 +1099,9 @@ class TrainingArguments:
             # Sometimes the line in the postinit has not been run before we end up here, so just checking we're not at
             # the default value.
             self._n_gpu = torch.cuda.device_count()
+        elif self.pippy:
+            # HACK
+            device = torch.device('cuda:0')
         else:
             # Here, we'll use torch.distributed.
             # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
