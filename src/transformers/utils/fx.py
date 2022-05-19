@@ -769,6 +769,18 @@ class HFTracer(Tracer):
                         node.type = torch.Tensor
                     # It is a concrete arg so it is not used and should be removed.
                     else:
+                        if hasattr(torch.fx._symbolic_trace, '_assert_is_none'):
+                            # Newer versions of torch.fx emit an assert statement
+                            # for concrete arguments; delete those before we delete
+                            # the concrete arg.
+                            to_delete = []
+                            for user in node.users:
+                                if user.target == torch.fx._symbolic_trace._assert_is_none:
+                                    to_delete.append(user)
+
+                            for user in to_delete:
+                                self.graph.erase_node(user)
+
                         self.graph.erase_node(node)
 
                 # TODO: solves GraphModule creation.
